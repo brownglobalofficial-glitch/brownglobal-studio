@@ -10,4 +10,5 @@ BrownGlobal Studio is the operating workspace for organizing work, brand assets,
 
 The first database plan is in `supabase/migrations`. Do not apply it until the Studio project is connected to its own Supabase project and the access roles have been reviewed.
 
-© 2026 BrownGlobal Holdings LLC
+Â© 2026 BrownGlobal Holdings LLC
+

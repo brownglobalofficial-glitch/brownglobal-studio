@@ -52,3 +52,4 @@ create policy "members view projects" on public.projects for select to authentic
 create policy "members manage projects" on public.projects for all to authenticated using (public.is_organization_member(organization_id)) with check (public.is_organization_member(organization_id));
 create policy "members view tasks" on public.tasks for select to authenticated using (exists(select 1 from projects p where p.id = project_id and public.is_organization_member(p.organization_id)));
 create policy "members manage tasks" on public.tasks for all to authenticated using (exists(select 1 from projects p where p.id = project_id and public.is_organization_member(p.organization_id))) with check (exists(select 1 from projects p where p.id = project_id and public.is_organization_member(p.organization_id)));
+
