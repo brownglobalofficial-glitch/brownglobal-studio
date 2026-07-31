@@ -17,6 +17,20 @@ create table public.organization_members (
   primary key (organization_id, user_id)
 );
 
+create function public.add_organization_owner_membership() returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  insert into public.organization_members (organization_id, user_id, role)
+  values (new.id, new.owner_id, 'owner');
+  return new;
+end;
+$$;
+
+create trigger add_organization_owner_membership
+after insert on public.organizations
+for each row execute function public.add_organization_owner_membership();
+
 create table public.projects (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -48,6 +62,9 @@ as $$ select exists(select 1 from organization_members where organization_id = t
 create policy "owners create organizations" on public.organizations for insert to authenticated with check (owner_id = auth.uid());
 create policy "members view organizations" on public.organizations for select to authenticated using (public.is_organization_member(id) or owner_id = auth.uid());
 create policy "members view memberships" on public.organization_members for select to authenticated using (user_id = auth.uid() or public.is_organization_member(organization_id));
+create policy "owners manage memberships" on public.organization_members for all to authenticated
+using (exists(select 1 from public.organizations o where o.id = organization_id and o.owner_id = auth.uid()))
+with check (exists(select 1 from public.organizations o where o.id = organization_id and o.owner_id = auth.uid()));
 create policy "members view projects" on public.projects for select to authenticated using (public.is_organization_member(organization_id));
 create policy "members manage projects" on public.projects for all to authenticated using (public.is_organization_member(organization_id)) with check (public.is_organization_member(organization_id));
 create policy "members view tasks" on public.tasks for select to authenticated using (exists(select 1 from projects p where p.id = project_id and public.is_organization_member(p.organization_id)));
