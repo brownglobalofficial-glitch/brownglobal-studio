@@ -20,20 +20,20 @@ export default function App() {
 
   return <main>
     <header className="topbar">
-      <a className="wordmark" href="#top"><img src="/brownglobal-icon.png" alt=""/><span>BrownGlobal <b>Studio</b></span></a>
+      <a className="wordmark" href="#top"><img src="/studio-logo.svg" alt="BrownGlobal Studio logo"/><span>BrownGlobal <b>Studio</b></span></a>
       <nav><a href="#product">Product</a><a href="#business">Business</a><a href="#access">Access</a></nav>
       <a className="button dark small" href="mailto:admin@brownglobal.app?subject=BrownGlobal%20Studio%20early%20access">Request access <span>â†—</span></a>
     </header>
 
     <section className="hero" id="top">
       <div className="hero-copy"><span className="eyebrow"><i/>Your business, brought together</span><h1>One calm place to <em>run the work.</em></h1><p>Organize projects, content, brand assets and your teamâ€”then move into Flow, Reach and Wave without losing the thread.</p><div className="actions"><a className="button primary" href="#product">See the workspace <span>â†“</span></a><a className="text-link" href="#business">Explore BrownGlobal Business â†’</a></div><div className="audience"><span>Built for</span><b>businesses</b><b>clubs</b><b>media teams</b></div></div>
-      <div className="orbit" aria-hidden="true"><div className="ring one"/><div className="ring two"/><div className="core"><img src="/brownglobal-icon.png" alt=""/><small>STUDIO</small></div><span className="chip plan">Plan</span><span className="chip create">Create</span><span className="chip grow">Grow</span></div>
+      <div className="orbit" aria-hidden="true"><div className="ring one"/><div className="ring two"/><div className="core"><img src="/studio-logo.svg" alt=""/><small>STUDIO</small></div><span className="chip plan">Plan</span><span className="chip create">Create</span><span className="chip grow">Grow</span></div>
     </section>
 
     <section className="product" id="product">
       <div className="section-title"><span className="eyebrow light"><i/>Interactive product preview</span><h2>Clear enough for Monday morning.</h2><p>Select a section and see how Studio holds the business together.</p></div>
       <div className="workspace">
-        <aside><div className="mini-brand"><img src="/brownglobal-icon.png" alt=""/><b>Studio</b></div><div className="org"><span>OG</span><div><b>Old Gold SC</b><small>Business workspace</small></div></div><small className="label">Workspace</small>{sections.map(item => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}><span>{item[0]}</span>{item}</button>)}<div className="upgrade"><small>BROWNGLOBAL BUSINESS</small><b>Bring every tool together.</b><a href="#business">Learn more â†’</a></div></aside>
+        <aside><div className="mini-brand"><img src="/studio-logo.svg" alt=""/><b>Studio</b></div><div className="org"><span>OG</span><div><b>Old Gold SC</b><small>Business workspace</small></div></div><small className="label">Workspace</small>{sections.map(item => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}><span>{item[0]}</span>{item}</button>)}<div className="upgrade"><small>BROWNGLOBAL BUSINESS</small><b>Bring every tool together.</b><a href="#business">Learn more â†’</a></div></aside>
         <div className="dashboard"><div className="dash-head"><div><small>STUDIO / {section.toUpperCase()}</small><h3>{section === "Overview" ? "Good morning, Austin." : section}</h3></div><span className="avatar">AB</span></div>
           {section === "Overview" ? <div className="grid">
             <article className="panel setup"><div className="panel-head"><div><small>GET STARTED</small><h4>Build your workspace</h4></div><b>{progress}%</b></div><div className="progress"><i style={{width: `${progress}%`}}/></div>{tasks.map((task, index) => <button className="task" key={task} onClick={() => setDone(current => current.includes(index) ? current.filter(id => id !== index) : [...current, index])}><span className={done.includes(index) ? "check checked" : "check"}>{done.includes(index) ? "âœ“" : ""}</span><span><b>{task}</b><small>{done.includes(index) ? "Completed" : "Ready"}</small></span><em>â†’</em></button>)}</article>
@@ -45,9 +45,9 @@ export default function App() {
       </div>
     </section>
 
-    <section className="business" id="business"><div><span className="eyebrow"><i/>BrownGlobal Business</span><h2>Studio is the home.<br/>The products stay powerful.</h2><p>Use each platform separately or bring eligible BrownGlobal tools together under one organization, one account and one business membership.</p></div><div className="system"><div className="system-center"><img src="/brownglobal-icon.png" alt=""/><b>Studio</b><small>ORGANIZE</small></div>{[["Flow","SERVE"],["Reach","GROW"],["Wave","STREAM"]].map((item,i)=><div className={`satellite s${i}`} key={item[0]}><span>{item[0][0]}</span><b>{item[0]}</b><small>{item[1]}</small></div>)}</div></section>
+    <section className="business" id="business"><div><span className="eyebrow"><i/>BrownGlobal Business</span><h2>Studio is the home.<br/>The products stay powerful.</h2><p>Use each platform separately or bring eligible BrownGlobal tools together under one organization, one account and one business membership.</p></div><div className="system"><div className="system-center"><img src="/studio-logo.svg" alt=""/><b>Studio</b><small>ORGANIZE</small></div>{[["Flow","SERVE"],["Reach","GROW"],["Wave","STREAM"]].map((item,i)=><div className={`satellite s${i}`} key={item[0]}><span>{item[0][0]}</span><b>{item[0]}</b><small>{item[1]}</small></div>)}</div></section>
     <section className="access" id="access"><span className="eyebrow light"><i/>Early access</span><h2>Build the system before the noise.</h2><p>Studio is being prepared as the operating home for BrownGlobal businesses, partners and approved teams.</p><a className="button primary" href="mailto:admin@brownglobal.app?subject=BrownGlobal%20Studio%20early%20access">Request early access <span>â†’</span></a></section>
-    <footer><a className="wordmark" href="#top"><img src="/brownglobal-icon.png" alt=""/><span>BrownGlobal <b>Studio</b></span></a><p>Organize the business. Keep the work moving.</p><div><a href="mailto:admin@brownglobal.app">admin@brownglobal.app</a><span>Â© 2026 BrownGlobal Holdings LLC</span></div></footer>
+    <footer><a className="wordmark" href="#top"><img src="/studio-logo.svg" alt="BrownGlobal Studio logo"/><span>BrownGlobal <b>Studio</b></span></a><p>Organize the business. Keep the work moving.</p><div><a href="mailto:admin@brownglobal.app">admin@brownglobal.app</a><span>Â© 2026 BrownGlobal Holdings LLC</span></div></footer>
   </main>;
 }
 
