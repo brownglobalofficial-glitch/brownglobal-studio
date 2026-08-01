@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import AuthPanel from "./AuthPanel";
+import { supabase } from "./supabase";
 
 const sections = ["Overview", "Work", "Brand", "Content", "Products", "Team"] as const;
 type Section = (typeof sections)[number];
@@ -16,13 +19,155 @@ const tasks = ["Add your business details", "Upload approved brand assets", "Inv
 export default function App() {
   const [section, setSection] = useState<Section>("Overview");
   const [done, setDone] = useState<number[]>([0]);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [organizationName, setOrganizationName] = useState("Old Gold SC");
+  const [organizationId, setOrganizationId] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [taskIds, setTaskIds] = useState<Record<number, string>>({});
+  const [newProjectName, setNewProjectName] = useState("");
+  const [workspaceMessage, setWorkspaceMessage] = useState("");
   const progress = useMemo(() => Math.round((done.length / tasks.length) * 100), [done]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session) void loadWorkspace(data.session);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      if (nextSession) void loadWorkspace(nextSession);
+      else {
+        setOrganizationId("");
+        setProjectId("");
+        setTaskIds({});
+        setDone([0]);
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  async function loadWorkspace(activeSession: Session) {
+    if (!supabase) return;
+    setWorkspaceMessage("Loading your workspace...");
+    const { data: existingOrganization } = await supabase
+      .from("organizations")
+      .select("id,name")
+      .eq("owner_id", activeSession.user.id)
+      .limit(1)
+      .maybeSingle();
+    let organization = existingOrganization;
+    if (!organization) {
+      const fullName = String(activeSession.user.user_metadata.full_name || activeSession.user.email?.split("@")[0] || "My");
+      const { data: created, error } = await supabase
+        .from("organizations")
+        .insert({ name: fullName + "'s workspace", owner_id: activeSession.user.id })
+        .select("id,name")
+        .single();
+      if (error) {
+        setWorkspaceMessage(error.message);
+        return;
+      }
+      organization = created;
+    }
+    setOrganizationId(organization.id);
+    setOrganizationName(organization.name);
+    const { data: existingProject } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("organization_id", organization.id)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+    let currentProject = existingProject;
+    if (!currentProject) {
+      const { data: createdProject, error } = await supabase
+        .from("projects")
+        .insert({ organization_id: organization.id, name: "Business setup", status: "active" })
+        .select("id")
+        .single();
+      if (error) {
+        setWorkspaceMessage(error.message);
+        return;
+      }
+      currentProject = createdProject;
+    }
+    setProjectId(currentProject.id);
+    let { data: savedTasks } = await supabase
+      .from("tasks")
+      .select("id,title,completed")
+      .eq("project_id", currentProject.id)
+      .order("created_at");
+    if (!savedTasks?.length) {
+      const { data: createdTasks, error } = await supabase
+        .from("tasks")
+        .insert(tasks.map(title => ({ project_id: currentProject.id, title })))
+        .select("id,title,completed");
+      if (error) {
+        setWorkspaceMessage(error.message);
+        return;
+      }
+      savedTasks = createdTasks;
+    }
+    const ids: Record<number, string> = {};
+    const completed: number[] = [];
+    tasks.forEach((title, index) => {
+      const saved = savedTasks?.find(item => item.title === title);
+      if (saved) {
+        ids[index] = saved.id;
+        if (saved.completed) completed.push(index);
+      }
+    });
+    setTaskIds(ids);
+    setDone(completed);
+    setWorkspaceMessage("Saved automatically to your BrownGlobal account.");
+  }
+
+  async function toggleTask(index: number) {
+    const completed = !done.includes(index);
+    setDone(current => completed ? [...current, index] : current.filter(id => id !== index));
+    if (supabase && taskIds[index]) {
+      const { error } = await supabase.from("tasks").update({ completed }).eq("id", taskIds[index]);
+      if (error) setWorkspaceMessage(error.message);
+    } else if (!session) {
+      setWorkspaceMessage("This preview is local. Sign up to save your progress.");
+    }
+  }
+
+  async function createProject(event: React.FormEvent) {
+    event.preventDefault();
+    if (!supabase || !session || !organizationId) {
+      setAuthOpen(true);
+      return;
+    }
+    if (!newProjectName.trim()) return;
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({ organization_id: organizationId, name: newProjectName.trim(), status: "active" })
+      .select("id")
+      .single();
+    if (error) {
+      setWorkspaceMessage(error.message);
+      return;
+    }
+    setProjectId(data.id);
+    setNewProjectName("");
+    setTaskIds({});
+    setDone([]);
+    setWorkspaceMessage("New project created. Add its first tasks from the Work section.");
+  }
+
+  async function signOut() {
+    await supabase?.auth.signOut();
+    setWorkspaceMessage("You are signed out.");
+  }
 
   return <main>
     <header className="topbar">
       <a className="wordmark" href="#top"><img src="/studio-logo.svg" alt="BrownGlobal Studio logo"/><span>BrownGlobal <b>Studio</b></span></a>
-      <nav><a href="#product">Product</a><a href="#business">Business</a><a href="#access">Access</a></nav>
-      <a className="button dark small" href="mailto:admin@brownglobal.app?subject=BrownGlobal%20Studio%20early%20access">Request access <span>&nearr;</span></a>
+      <nav><a href="#product">Product</a><a href="#business">Business</a><a href="#plans">Plans</a></nav>
+      <div className="account-actions"><a className="button dark small" href="#product">Open Studio <span>&nearr;</span></a><button className={"account-button " + (session ? "signed" : "")} onClick={session ? signOut : () => setAuthOpen(true)}>{session ? "Sign out" : "Sign up"}</button></div>
     </header>
 
     <section className="hero" id="top">
@@ -33,10 +178,11 @@ export default function App() {
     <section className="product" id="product">
       <div className="section-title"><span className="eyebrow light"><i/>Interactive product preview</span><h2>Clear enough for Monday morning.</h2><p>Select a section and see how Studio holds the business together.</p></div>
       <div className="workspace">
-        <aside><div className="mini-brand"><img src="/studio-logo.svg" alt=""/><b>Studio</b></div><div className="org"><span>OG</span><div><b>Old Gold SC</b><small>Business workspace</small></div></div><small className="label">Workspace</small>{sections.map(item => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}><span>{item[0]}</span>{item}</button>)}<div className="upgrade"><small>BROWNGLOBAL BUSINESS</small><b>Bring every tool together.</b><a href="#business">Learn more &rarr;</a></div></aside>
-        <div className="dashboard"><div className="dash-head"><div><small>STUDIO / {section.toUpperCase()}</small><h3>{section === "Overview" ? "Good morning, Austin." : section}</h3></div><span className="avatar">AB</span></div>
+        <aside><div className="mini-brand"><img src="/studio-logo.svg" alt=""/><b>Studio</b></div><div className="org"><span>{organizationName.split(" ").map(word=>word[0]).join("").slice(0,2).toUpperCase()}</span><div><b>{organizationName}</b><small>{session ? "Saved workspace" : "Interactive preview"}</small></div></div><small className="label">Workspace</small>{sections.map(item => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}><span>{item[0]}</span>{item}</button>)}<div className="upgrade"><small>BROWNGLOBAL BUSINESS</small><b>Bring every tool together.</b><a href="#plans">Compare plans &rarr;</a></div></aside>
+        <div className="dashboard"><div className="dash-head"><div><small>STUDIO / {section.toUpperCase()}</small><h3>{section === "Overview" ? "Good morning, " + String(session?.user.user_metadata.full_name || "there").split(" ")[0] + "." : section}</h3><span className="workspace-status"><i/>{workspaceMessage || (session ? "Your workspace is connected." : "Preview mode - sign up to save.")}</span></div><span className="avatar">{String(session?.user.user_metadata.full_name || "BG").split(" ").map((part:string)=>part[0]).join("").slice(0,2).toUpperCase()}</span></div>
+          {session && <form className="new-project-form" onSubmit={createProject}><input aria-label="New project name" value={newProjectName} onChange={event=>setNewProjectName(event.target.value)} placeholder="Create another project" /><button>Add project</button></form>}
           {section === "Overview" ? <div className="grid">
-            <article className="panel setup"><div className="panel-head"><div><small>GET STARTED</small><h4>Build your workspace</h4></div><b>{progress}%</b></div><div className="progress"><i style={{width: `${progress}%`}}/></div>{tasks.map((task, index) => <button className="task" key={task} onClick={() => setDone(current => current.includes(index) ? current.filter(id => id !== index) : [...current, index])}><span className={done.includes(index) ? "check checked" : "check"}>{done.includes(index) ? "\u2713" : ""}</span><span><b>{task}</b><small>{done.includes(index) ? "Completed" : "Ready"}</small></span><em>&rarr;</em></button>)}</article>
+            <article className="panel setup"><div className="panel-head"><div><small>GET STARTED</small><h4>Build your workspace</h4></div><b>{progress}%</b></div><div className="progress"><i style={{width: `${progress}%`}}/></div>{tasks.map((task, index) => <button className="task" key={task} onClick={() => toggleTask(index)}><span className={done.includes(index) ? "check checked" : "check"}>{done.includes(index) ? "\u2713" : ""}</span><span><b>{task}</b><small>{done.includes(index) ? "Completed" : "Ready"}</small></span><em>&rarr;</em></button>)}</article>
             <article className="panel today"><div className="panel-head"><div><small>TODAY</small><h4>Friday, 31 July</h4></div><b>+</b></div><div className="meeting"><time>10:00</time><span><b>Review training photos</b><small>Content &middot; GSN Clubs</small></span></div><div className="meeting"><time>14:30</time><span><b>Sponsor check-in</b><small>Reach &middot; Campaign</small></span></div><p>Open afternoon <b>3h 30m</b></p></article>
             <article className="panel connected"><div className="panel-head"><div><small>YOUR PRODUCTS</small><h4>Connected to Studio</h4></div></div>{[["F","Flow","Customers & service"],["R","Reach","Campaigns & sponsorships"],["W","Wave","Live & on demand"]].map(product => <div className="product-row" key={product[1]}><span>{product[0]}</span><div><b>{product[1]}</b><small>{product[2]}</small></div><em>Open &nearr;</em></div>)}</article>
             <article className="panel pulse"><div className="panel-head"><div><small>THIS WEEK</small><h4>Business pulse</h4></div><b>&uarr; 18%</b></div><strong>12</strong><p>tasks completed</p><div className="bars">{[35,55,42,72,90,64,28].map((height,i) => <i key={i} style={{height: `${height}%`}}/>)}</div></article>
@@ -46,8 +192,10 @@ export default function App() {
     </section>
 
     <section className="business" id="business"><div><span className="eyebrow"><i/>BrownGlobal Business</span><h2>Studio is the home.<br/>The products stay powerful.</h2><p>Use each platform separately or bring eligible BrownGlobal tools together under one organization, one account and one business membership.</p></div><div className="system"><div className="system-center"><img src="/studio-logo.svg" alt=""/><b>Studio</b><small>ORGANIZE</small></div>{[["Flow","SERVE"],["Reach","GROW"],["Wave","STREAM"]].map((item,i)=><div className={`satellite s${i}`} key={item[0]}><span>{item[0][0]}</span><b>{item[0]}</b><small>{item[1]}</small></div>)}</div></section>
+    <section className="plans" id="plans"><div className="plans-header"><span className="eyebrow"><i/>One account, two levels</span><h2>Useful for free. Connected with Business.</h2><p>The free plan should make every BrownGlobal product usable. Business adds organization-wide capabilities instead of locking away the basic product.</p></div><div className="plan-grid"><article className="plan-card"><small>FREE</small><h3>$0</h3><p>For one person or a small organization.</p><ul><li>One BrownGlobal account and workspace</li><li>Core projects, tasks and Reach planning</li><li>Access to eligible BrownGlobal products</li><li>Standard support</li></ul></article><article className="plan-card business-plan"><small>BROWNGLOBAL BUSINESS</small><h3>One membership</h3><p>Pricing will be announced before paid enrollment opens.</p><ul><li>Team members, roles and approvals</li><li>Shared brand library and templates</li><li>Expanded projects and cross-product organization</li><li>Priority planning and support</li></ul></article></div></section>
     <section className="access" id="access"><span className="eyebrow light"><i/>Early access</span><h2>Build the system before the noise.</h2><p>Studio is being prepared as the operating home for BrownGlobal businesses, partners and approved teams.</p><a className="button primary" href="mailto:admin@brownglobal.app?subject=BrownGlobal%20Studio%20early%20access">Request early access <span>&rarr;</span></a></section>
     <footer><a className="wordmark" href="#top"><img src="/studio-logo.svg" alt="BrownGlobal Studio logo"/><span>BrownGlobal <b>Studio</b></span></a><p>Organize the business. Keep the work moving.</p><div><a href="mailto:admin@brownglobal.app">admin@brownglobal.app</a><span>&copy; 2026 BrownGlobal Holdings LLC</span></div></footer>
+    <AuthPanel open={authOpen} onClose={()=>setAuthOpen(false)} product="Studio" />
   </main>;
 }
 
