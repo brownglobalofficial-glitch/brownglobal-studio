@@ -21,6 +21,7 @@ export default function App() {
   const [done, setDone] = useState<number[]>([0]);
   const [session, setSession] = useState<Session | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [organizationName, setOrganizationName] = useState("Old Gold SC");
   const [organizationId, setOrganizationId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -165,9 +166,9 @@ export default function App() {
 
   return <main>
     <header className="topbar">
-      <a className="wordmark" href="#top"><img src="/studio-logo.svg" alt="BrownGlobal Studio logo"/><span>BrownGlobal <b>Studio</b></span></a>
-      <nav><a href="#product">Product</a><a href="#business">Business</a><a href="#plans">Plans</a></nav>
-      <div className="account-actions"><a className="button dark small" href="#product">Open Studio <span>&nearr;</span></a><button className={"account-button " + (session ? "signed" : "")} onClick={session ? signOut : () => setAuthOpen(true)}>{session ? "Sign out" : "Sign up"}</button></div>
+      <a className="wordmark" href="#top" onClick={()=>setMenuOpen(false)}><img src="/studio-logo.svg" alt=""/><span>BrownGlobal <b>Studio</b></span></a>
+      <nav id="primary-navigation" className={menuOpen ? "open" : ""} aria-label="Primary navigation"><a href="#product" onClick={()=>setMenuOpen(false)}>Workspace</a><a href="#business" onClick={()=>setMenuOpen(false)}>Business</a><a href="#plans" onClick={()=>setMenuOpen(false)}>Pricing</a><a className="mobile-nav-cta" href="#product" onClick={()=>setMenuOpen(false)}>Open Studio <span>↗</span></a></nav>
+      <div className="account-actions"><a className="button dark small desktop-cta" href="#product">Open Studio <span>↗</span></a><button className="menu-button" aria-controls="primary-navigation" aria-expanded={menuOpen} onClick={()=>setMenuOpen(open=>!open)}>{menuOpen ? "Close" : "Menu"}</button><button className={"account-button " + (session ? "signed" : "")} onClick={session ? signOut : () => setAuthOpen(true)}>{session ? "Sign out" : "Sign up"}</button></div>
     </header>
 
     <section className="hero" id="top">
@@ -184,7 +185,7 @@ export default function App() {
           {section === "Overview" ? <div className="grid">
             <article className="panel setup"><div className="panel-head"><div><small>GET STARTED</small><h4>Build your workspace</h4></div><b>{progress}%</b></div><div className="progress"><i style={{width: `${progress}%`}}/></div>{tasks.map((task, index) => <button className="task" key={task} onClick={() => toggleTask(index)}><span className={done.includes(index) ? "check checked" : "check"}>{done.includes(index) ? "\u2713" : ""}</span><span><b>{task}</b><small>{done.includes(index) ? "Completed" : "Ready"}</small></span><em>&rarr;</em></button>)}</article>
             <article className="panel today"><div className="panel-head"><div><small>TODAY</small><h4>Friday, 31 July</h4></div><b>+</b></div><div className="meeting"><time>10:00</time><span><b>Review training photos</b><small>Content &middot; GSN Clubs</small></span></div><div className="meeting"><time>14:30</time><span><b>Sponsor check-in</b><small>Reach &middot; Campaign</small></span></div><p>Open afternoon <b>3h 30m</b></p></article>
-            <article className="panel connected"><div className="panel-head"><div><small>YOUR PRODUCTS</small><h4>Connected to Studio</h4></div></div>{[["F","Flow","Customers & service"],["R","Reach","Campaigns & sponsorships"],["W","Wave","Live & on demand"]].map(product => <div className="product-row" key={product[1]}><span>{product[0]}</span><div><b>{product[1]}</b><small>{product[2]}</small></div><em>Open &nearr;</em></div>)}</article>
+            <article className="panel connected"><div className="panel-head"><div><small>YOUR PRODUCTS</small><h4>Connected to Studio</h4></div></div>{[["F","Flow","Customers & service"],["R","Reach","Campaigns & sponsorships"],["W","Wave","Live & on demand"]].map(product => <div className="product-row" key={product[1]}><span>{product[0]}</span><div><b>{product[1]}</b><small>{product[2]}</small></div><em>Connected</em></div>)}</article>
             <article className="panel pulse"><div className="panel-head"><div><small>THIS WEEK</small><h4>Business pulse</h4></div><b>&uarr; 18%</b></div><strong>12</strong><p>tasks completed</p><div className="bars">{[35,55,42,72,90,64,28].map((height,i) => <i key={i} style={{height: `${height}%`}}/>)}</div></article>
           </div> : <SectionView section={section}/>} 
         </div>
@@ -201,6 +202,6 @@ export default function App() {
 
 function SectionView({ section }: { section: Exclude<Section, "Overview"> }) {
   const data = sectionData[section];
-  return <div className="section-view"><div><small>WORKSPACE</small><h4>{data.title}</h4><p>{data.copy}</p><button>+ Add new</button></div><div className="view-cards">{data.cards.map((card,index)=><article key={card}><span>0{index+1}</span><h5>{card}</h5><p>{index === 0 ? "In progress" : index === 1 ? "Ready for review" : "Planned"}</p><button>Open &rarr;</button></article>)}</div></div>;
+  return <div className="section-view"><div><small>WORKSPACE MODULE</small><h4>{data.title}</h4><p>{data.copy}</p><span className="preview-badge">Preview module</span></div><div className="view-cards">{data.cards.map((card,index)=><article key={card}><span>0{index+1}</span><h5>{card}</h5><p>{index === 0 ? "In progress" : index === 1 ? "Ready for review" : "Planned"}</p><small>Available in the connected workspace</small></article>)}</div></div>;
 }
 
