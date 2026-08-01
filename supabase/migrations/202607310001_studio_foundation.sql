@@ -1,5 +1,10 @@
--- BrownGlobal Studio foundation. Apply after the project is connected to Supabase.
+-- BrownGlobal Studio foundation.
+-- Apply only to the dedicated BrownGlobal Studio Supabase project.
 create extension if not exists "pgcrypto";
+
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
 
 create table public.organizations (
   id uuid primary key default gen_random_uuid(),
@@ -17,8 +22,11 @@ create table public.organization_members (
   primary key (organization_id, user_id)
 );
 
-create function public.add_organization_owner_membership() returns trigger
-language plpgsql security definer set search_path = public
+create or replace function private.add_organization_owner_membership()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
 as $$
 begin
   insert into public.organization_members (organization_id, user_id, role)
@@ -27,9 +35,11 @@ begin
 end;
 $$;
 
+revoke execute on function private.add_organization_owner_membership() from public, anon, authenticated;
+
 create trigger add_organization_owner_membership
 after insert on public.organizations
-for each row execute function public.add_organization_owner_membership();
+for each row execute function private.add_organization_owner_membership();
 
 create table public.projects (
   id uuid primary key default gen_random_uuid(),
@@ -50,23 +60,115 @@ create table public.tasks (
   created_at timestamptz not null default now()
 );
 
+create index organizations_owner_id_idx on public.organizations (owner_id);
+create index organization_members_user_id_idx on public.organization_members (user_id);
+create index projects_organization_id_idx on public.projects (organization_id);
+create index tasks_project_id_idx on public.tasks (project_id);
+create index tasks_assignee_id_idx on public.tasks (assignee_id);
+
 alter table public.organizations enable row level security;
 alter table public.organization_members enable row level security;
 alter table public.projects enable row level security;
 alter table public.tasks enable row level security;
 
-create function public.is_organization_member(target uuid) returns boolean
-language sql stable security definer set search_path = public
-as $$ select exists(select 1 from organization_members where organization_id = target and user_id = auth.uid()); $$;
+create or replace function private.is_organization_member(target uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.organization_members
+    where organization_id = target
+      and user_id = (select auth.uid())
+  );
+$$;
 
-create policy "owners create organizations" on public.organizations for insert to authenticated with check (owner_id = auth.uid());
-create policy "members view organizations" on public.organizations for select to authenticated using (public.is_organization_member(id) or owner_id = auth.uid());
-create policy "members view memberships" on public.organization_members for select to authenticated using (user_id = auth.uid() or public.is_organization_member(organization_id));
-create policy "owners manage memberships" on public.organization_members for all to authenticated
-using (exists(select 1 from public.organizations o where o.id = organization_id and o.owner_id = auth.uid()))
-with check (exists(select 1 from public.organizations o where o.id = organization_id and o.owner_id = auth.uid()));
-create policy "members view projects" on public.projects for select to authenticated using (public.is_organization_member(organization_id));
-create policy "members manage projects" on public.projects for all to authenticated using (public.is_organization_member(organization_id)) with check (public.is_organization_member(organization_id));
-create policy "members view tasks" on public.tasks for select to authenticated using (exists(select 1 from projects p where p.id = project_id and public.is_organization_member(p.organization_id)));
-create policy "members manage tasks" on public.tasks for all to authenticated using (exists(select 1 from projects p where p.id = project_id and public.is_organization_member(p.organization_id))) with check (exists(select 1 from projects p where p.id = project_id and public.is_organization_member(p.organization_id)));
+revoke execute on function private.is_organization_member(uuid) from public, anon;
+grant execute on function private.is_organization_member(uuid) to authenticated;
+
+create policy "owners create organizations"
+on public.organizations for insert
+to authenticated
+with check (owner_id = (select auth.uid()));
+
+create policy "members view organizations"
+on public.organizations for select
+to authenticated
+using ((select private.is_organization_member(id)) or owner_id = (select auth.uid()));
+
+create policy "members view memberships"
+on public.organization_members for select
+to authenticated
+using (user_id = (select auth.uid()) or (select private.is_organization_member(organization_id)));
+
+create policy "owners manage memberships"
+on public.organization_members for all
+to authenticated
+using (
+  exists (
+    select 1 from public.organizations o
+    where o.id = organization_id
+      and o.owner_id = (select auth.uid())
+  )
+)
+with check (
+  exists (
+    select 1 from public.organizations o
+    where o.id = organization_id
+      and o.owner_id = (select auth.uid())
+  )
+);
+
+create policy "members view projects"
+on public.projects for select
+to authenticated
+using ((select private.is_organization_member(organization_id)));
+
+create policy "members manage projects"
+on public.projects for all
+to authenticated
+using ((select private.is_organization_member(organization_id)))
+with check ((select private.is_organization_member(organization_id)));
+
+create policy "members view tasks"
+on public.tasks for select
+to authenticated
+using (
+  exists (
+    select 1 from public.projects p
+    where p.id = project_id
+      and (select private.is_organization_member(p.organization_id))
+  )
+);
+
+create policy "members manage tasks"
+on public.tasks for all
+to authenticated
+using (
+  exists (
+    select 1 from public.projects p
+    where p.id = project_id
+      and (select private.is_organization_member(p.organization_id))
+  )
+)
+with check (
+  exists (
+    select 1 from public.projects p
+    where p.id = project_id
+      and (select private.is_organization_member(p.organization_id))
+  )
+);
+
+revoke all on table public.organizations from public, anon;
+revoke all on table public.organization_members from public, anon;
+revoke all on table public.projects from public, anon;
+revoke all on table public.tasks from public, anon;
+
+grant select, insert on table public.organizations to authenticated;
+grant select, insert, update, delete on table public.organization_members to authenticated;
+grant select, insert, update, delete on table public.projects to authenticated;
+grant select, insert, update, delete on table public.tasks to authenticated;
 
